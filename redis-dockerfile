@@ -1,0 +1,14 @@
+ARG ALPINE_VERSION
+FROM alpine:$ALPINE_VERSION
+LABEL maintainer="Pierre Dahmani <Pierre.dahmani@alumni.fh-aachen.de>"
+
+ARG TZ
+ENV TZ=$TZ
+
+ADD ./scripts/redis/redis-setup.sh /setup/setup.sh
+
+RUN DEBIAN_FRONTEND=noninteractive apk add -qq redis && \
+    chmod +x /setup/setup.sh
+
+# entry point of container.
+CMD [ "sh", "-c", "/setup/setup.sh" ]

@@ -1,0 +1,92 @@
+version: "3.8"
+
+# services basicly means scalable amount of (even different) containers
+services:
+    apache2-webserver:
+        env_file:
+            - nextcloud-env
+        # don't use swarm mode for now
+        # deploy:
+        #     replicas: 1
+        image: ${COMPOSE_PROJECT_NAME}-webserver
+        build:
+            context: .
+            dockerfile: nextcloud-dockerfile
+            args:
+                LETSENCRYPT_CERT_DIR: ${NEXTCLOUD_CERTIFICATE_DIR}
+                DOMAIN_NAME: ${DOMAIN_NAME}
+                UBUNTU_VERSION: ${UBUNTU_VERSION}
+                NEXTCLOUD_DATA_PATH: ${NEXTCLOUD_DATA_PATH}
+                NEXTCLOUD_DH_DIR: ${NEXTCLOUD_DH_DIR}
+                NEXTCLOUD_VERSION: ${NEXTCLOUD_VERSION}
+                TZ: ${TZ}
+        # this ONLY makes sure contianer will be STARTED after.
+        # does not wait until something is set up
+        # -> solve with own script that checks for port or a file :]
+        # can do later, nextcloud takes ages to download & setup.
+        depends_on:
+            - mariadb-database
+            - redis-keyvaluestore
+        volumes:
+            - ${HOST_DATA_PATH}/nextcloud/certificates:${NEXTCLOUD_CERTIFICATE_DIR}
+            - ${HOST_DATA_PATH}/nextcloud/data:${NEXTCLOUD_DATA_PATH}
+            - ${HOST_DATA_PATH}/nextcloud/config:${NEXTCLOUD_WEB_ROOT}
+            - ${HOST_DATA_PATH}/nextcloud/dh:${NEXTCLOUD_DH_DIR}
+        ports:
+        # MAYBE in future bind ports to localhost and use nginx as reverse
+        # proxy
+             - "80:80/tcp"
+             - "443:443/tcp"
+        networks:
+            - nextcloudnetwork
+
+
+    # database server for our website
+    # don't change the name of this service. it is referenced inside the
+    # nextcloud container
+    mariadb-database:
+        env_file:
+            - mariadb-env
+        # deploy does only take effect when using docker stack -> swarm with
+        # manager and worker nodes. MAYBE test this later!
+        # deploy:
+        #    replicas: 2
+        image: ${COMPOSE_PROJECT_NAME}-mariadb
+        build:
+            context: .
+            dockerfile: mariadb-dockerfile
+            args:
+                ALPINE_VERSION: ${ALPINE_VERSION}
+                TZ: ${TZ}
+                MARIADB_DATA_PATH: ${MARIADB_DATA_PATH}
+        # long syntax will NOT auto create the folder
+        # short syntax will create the dir in src and dest with root privileges.
+        # care about that. permissions often ruin stuff.
+        volumes:
+            - ${HOST_DATA_PATH}/nextcloud/mariadb:${MARIADB_DATA_PATH}
+        networks:
+            - nextcloudnetwork
+
+
+    # key value store used to increase performance by caching favourite items
+    # don't change the name of this service. it is referenced inside the
+    # nextcloud container
+    redis-keyvaluestore:
+        # deploy:
+        #     replicas: 1
+        image: ${COMPOSE_PROJECT_NAME}-redis
+        build:
+            context: .
+            dockerfile: redis-dockerfile
+            args:
+                ALPINE_VERSION: ${ALPINE_VERSION}
+                TZ: ${TZ}
+        networks:
+            - nextcloudnetwork
+
+
+networks:
+    # enables nodes to communicate
+    # overlay also working, but use bridge since we dont swarm mode for now.
+    nextcloudnetwork:
+        driver: bridge

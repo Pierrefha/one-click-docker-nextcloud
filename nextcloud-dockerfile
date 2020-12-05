@@ -1,0 +1,40 @@
+ARG UBUNTU_VERSION
+FROM ubuntu:$UBUNTU_VERSION
+LABEL maintainer="Pierre Dahmani <Pierre.dahmani@alumni.fh-aachen.de>"
+
+ADD ./basics /setup/basics/
+ADD ./scripts/nextcloud /setup/scripts/
+
+ARG LETSENCRYPT_CERT_DIR
+ARG DOMAIN_NAME
+ARG NEXTCLOUD_DATA_PATH
+ARG TZ
+ARG NEXTCLOUD_DH_DIR
+ARG NEXTCLOUD_VERSION
+ENV LETSENCRYPT_CERT_DIR=$LETSENCRYPT_CERT_DIR DOMAIN_NAME=$DOMAIN_NAME \
+    NEXTCLOUD_DATA_PATH=$NEXTCLOUD_DATA_PATH TZ=$TZ \
+    NEXTCLOUD_DH_DIR=$NEXTCLOUD_DH_DIR \
+    NEXTCLOUD_VERSION=$NEXTCLOUD_VERSION
+
+# install stuff. always use apt-get for docker -> alway use apt-get in general!
+RUN apt-get update && apt-get upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apt-utils \
+    python-certbot-apache \
+    tar curl vim wget net-tools build-essential redis ed \
+    apache2 libapache2-mod-php7.2 mariadb-client libmysqlclient-dev \
+    inetutils-ping tzdata cron iptables \
+    php7.2 php7.2-bz2 php7.2-cli php7.2-common php7.2-curl php7.2-gd \
+    php7.2-gmp php7.2-intl php7.2-mbstring php7.2-mysql php-redis redis-server php7.2-xml \
+    php7.2-xmlrpc php7.2-zip && \
+    # download nextcloud
+    wget https://download.nextcloud.com/server/releases/nextcloud-$NEXTCLOUD_VERSION.tar.bz2 \
+    && wget https://download.nextcloud.com/server/releases/nextcloud-$NEXTCLOUD_VERSION.tar.bz2.sha256 \
+    || ( echo "Could not download sources. No internet connection?" && return 1) && \
+    sha256sum -c nextcloud-$NEXTCLOUD_VERSION.tar.bz2.sha256 < nextcloud-$NEXTCLOUD_VERSION.tar.bz2 || \
+        ( echo "Checksums don't match. Data is breached. Man in the middle attacked?" \
+          && return 1) && \
+    mv /setup/scripts/nextcloud-setup.sh /setup/setup.sh && \
+    chmod +x /setup/setup.sh
+
+# installs and runs nextcloud
+CMD [ "sh", "-c", "/setup/setup.sh" ]
