@@ -47,12 +47,7 @@ su www-data -s /bin/sh -c 'php occ maintenance:install --database="mysql" \
     php occ config:app:set --value 1 password_policy enforeNumericCharacters && \
     php occ config:app:set --value 1 password_policy enforeUpperLowerCase && \
     echo "setup completed succesfully." || echo "setup did not complete \
-    succesfully"' && \
-    # clean up default data (besides manual) from our server
-    # MAYBE fix this, somehow not working currently
-    mv "$NEXTCLOUD_DATA_PATH/nextcloud/files/Nextcloud Manual.pdf" ./nextcloud-manual.pdf && \
-    rm -r $NEXTCLOUD_DATA_PATH/nextcloud/files/* && \
-    mv ./nextcloud-manual.pdf $NEXTCLOUD_DATA_PATH/nextcloud/files/ )
+    succesfully"' )
 
 # add redis mem caching if not yet using it AND domain of server as trusted
 # domain for nextcloud hosting
@@ -62,6 +57,12 @@ egrep "'redis' =>" /var/www/nextcloud/config/config.php && \
     chmod 666 /var/www/nextcloud/config/config.php && \
     ed /var/www/nextcloud/config/config.php << EOF
 10i
+  // adapt logging so we can see login attempts etc. default is warning+ only.
+  // https://docs.nextcloud.com/server/19/admin_manual/configuration_server/config_sample_php_parameters.html#logging
+  'loglevel' => 1,
+  // use european time format
+  'logdateformat' => 'd.m.Y H:i:s',
+  // use redis memcaching
   'memcache.distributed' => '\OC\Memcache\Redis',
   'memcache.locking' => '\OC\Memcache\Redis',
   'redis' => [
